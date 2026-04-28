@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A GitHub Pages-ready AI learning tutor with Duolingo-style lessons, local auth, and fast in-browser study file parsing." />
+    <meta name="theme-color" content="#041226" />
+    <meta name="color-scheme" content="dark light" />
+    <title>OmarTech Learn</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="OmarTech Learn" />
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <div id="authGate" class="auth-gate">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <img src="icon.png" alt="OmarTech Learn icon" />
+          <div>
+            <h1>OmarTech Learn</h1>
+            <p>Fast Duolingo-style lessons, reviews, and progress tracking from your own study files.</p>
+          </div>
+        </div>
+
+        <div class="auth-tabs">
+          <button id="showLoginBtn" class="auth-tab active" type="button">Login</button>
+          <button id="showSignupBtn" class="auth-tab" type="button">Sign up</button>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+          <label for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" required />
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" required />
+          <button class="primary-btn wide" type="submit">Login</button>
+        </form>
+
+        <form id="signupForm" class="auth-form hidden">
+          <label for="signupName">Name</label>
+          <input id="signupName" type="text" placeholder="Your name" autocomplete="name" required />
+          <label for="signupEmail">Email</label>
+          <input id="signupEmail" type="email" placeholder="you@example.com" autocomplete="email" required />
+          <label for="signupPassword">Password</label>
+          <input id="signupPassword" type="password" placeholder="Create a password" autocomplete="new-password" minlength="6" required />
+          <button class="primary-btn wide" type="submit">Create account</button>
+        </form>
+
+        <p class="auth-note">Demo auth stays in your browser and now stores salted password hashes instead of plain text.</p>
+      </div>
+    </div>
+
+    <div id="app" class="app hidden">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <img class="brand-icon" src="icon.png" alt="OmarTech Learn logo" />
+          <div>
+            <div class="brand-title">OmarTech Learn</div>
+            <div class="brand-subtitle">Teach → Got it → Quiz → Progress</div>
+          </div>
+        </div>
+
+        <nav class="top-nav" aria-label="Primary">
+          <button type="button" data-route="upload" class="nav-btn active">Upload</button>
+          <button type="button" data-route="course" class="nav-btn">Course</button>
+          <button type="button" data-route="learn" class="nav-btn">Learn</button>
+          <button type="button" data-route="review" class="nav-btn">Review</button>
+        </nav>
+
+        <div class="top-actions">
+          <div class="user-chip">
+            <span id="userChipName">Guest</span>
+          </div>
+          <button id="settingsBtn" class="ghost-btn" type="button">Settings</button>
+        </div>
+      </header>
+
+      <main class="page-shell">
+        <section class="hero-panel">
+          <div class="hero-copy">
+            <span class="eyebrow">Upgraded version</span>
+            <h2>Faster, safer, and smarter lessons.</h2>
+            <p>
+              Upload your material, clean it, press <strong>Begin</strong>, and get a smarter course with searchable lessons, adaptive review, fair XP, import/export, and stronger browser-only privacy controls.
+            </p>
+            <div class="hero-actions">
+              <label class="primary-btn file-label" aria-label="Upload study files">
+                <input id="fileInput" type="file" multiple accept=".pdf,.docx,.pptx,.txt,.md,.markdown" />
+                Upload files
+              </label>
+              <button id="loadSampleBtn" class="secondary-btn" type="button">Load sample</button>
+              <button id="pasteOpenBtn" class="ghost-btn" type="button">Paste text</button>
+              <button id="importProgressBtn" class="ghost-btn" type="button">Import progress</button>
+              <input id="progressInput" class="visually-hidden" type="file" accept="application/json,.json" />
+            </div>
+            <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Drop study files here or press Enter to choose files">Drop files here, or press Enter to browse.</div>
+          </div>
+          <div class="hero-visual">
+            <img src="hero.png" alt="OmarTech Learn style artwork" loading="lazy" />
+          </div>
+        </section>
+
+        <section class="stats-grid">
+          <article class="stat-card"><span id="statFiles">0</span><small>Files</small></article>
+          <article class="stat-card"><span id="statBlocks">0</span><small>Blocks</small></article>
+          <article class="stat-card"><span id="statLessons">0</span><small>Lessons</small></article>
+          <article class="stat-card"><span id="statProgress">0%</span><small>Progress</small></article>
+          <article class="stat-card"><span id="statXp">0</span><small>XP</small></article>
+          <article class="stat-card"><span id="statStreak">0</span><small>Day streak</small></article>
+          <article class="stat-card"><span id="statTodayXp">0/30</span><small>Today goal</small></article>
+          <article class="stat-card"><span id="statCleanup">0</span><small>Removed junk</small></article>
+          <article class="stat-card"><span id="statAccuracy">0%</span><small>Accuracy</small></article>
+          <article class="stat-card"><span id="statDueReview">0</span><small>Due review</small></article>
+          <article class="stat-card"><span id="statStudyTime">0m</span><small>Study time</small></article>
+        </section>
+
+        <section id="route-upload" class="route visible">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Step 1</span>
+                <h3>Upload and clean</h3>
+                <p>We automatically throw away names, titles, authors, dates, page numbers, slide numbers, headers, footers, and file junk.</p>
+              </div>
+              <div class="panel-actions">
+                <button id="cleanBtn" class="ghost-btn" type="button">Clean again</button>
+                <button id="beginBtn" class="primary-btn" type="button">Begin</button>
+              </div>
+            </div>
+
+            <div class="three-col">
+              <aside class="side-card">
+                <h4>Files</h4>
+                <div id="fileList" class="stack-list"></div>
+              </aside>
+
+              <div class="center-card">
+                <div id="unitList" class="unit-list empty">No study material yet. Upload a file or load the sample.</div>
+              </div>
+
+              <aside class="side-card">
+                <h4>Cleaner rules</h4>
+                <ul class="cleaner-list">
+                  <li>Name / Student name</li>
+                  <li>Title / Titel / Author</li>
+                  <li>Teacher / Course / Date</li>
+                  <li>Page / Slide numbers</li>
+                  <li>Headers / Footers / File names</li>
+                  <li>Short cover-page junk</li>
+                  <li>Repeated headers and footers</li>
+                  <li>OCR spacing and common web entities</li>
+                </ul>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section id="route-course" class="route">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Step 2</span>
+                <h3>Your course</h3>
+                <p>After you press Begin, your material turns into a fixed number of lessons you can start one by one.</p>
+              </div>
+            </div>
+            <div id="courseSummary" class="course-summary empty-block">
+              Press <strong>Begin</strong> after uploading and cleaning to create your lessons.
+            </div>
+            <div id="courseTools" class="course-tools hidden" aria-label="Lesson browsing tools">
+              <label class="search-label" for="lessonSearch">Search lessons</label>
+              <input id="lessonSearch" class="typed-input" type="search" placeholder="Search title, summary, or key points" autocomplete="off" />
+              <div class="filter-group" role="group" aria-label="Filter lessons">
+                <button class="small-btn active" type="button" data-lesson-filter="all">All</button>
+                <button class="small-btn" type="button" data-lesson-filter="ready">Ready</button>
+                <button class="small-btn" type="button" data-lesson-filter="done">Done</button>
+                <button class="small-btn" type="button" data-lesson-filter="review">Review</button>
+                <button class="small-btn" type="button" data-lesson-filter="bookmarked">Bookmarked</button>
+              </div>
+            </div>
+            <div id="lessonGrid" class="lesson-grid"></div>
+          </div>
+        </section>
+
+        <section id="route-learn" class="route">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Step 3</span>
+                <h3>Lesson player</h3>
+                <p>Every lesson starts with teaching. Then you click <strong>Got it</strong> and answer.</p>
+              </div>
+            </div>
+            <div id="lessonPlayer" class="lesson-player empty-block">
+              Select a lesson from the course tab to start learning.
+            </div>
+          </div>
+        </section>
+
+        <section id="route-review" class="route">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Review</span>
+                <h3>Weak points</h3>
+                <p>Wrong answers go here so you can review them again.</p>
+              </div>
+              <div class="panel-actions">
+                <button id="reviewDueBtn" class="ghost-btn" type="button">Due now</button>
+                <button id="clearReviewBtn" class="ghost-btn" type="button">Clear mastered</button>
+                <button id="exportBtn" class="ghost-btn" type="button">Export progress</button>
+                <button id="resetBtn" class="danger-btn" type="button">Reset workspace</button>
+              </div>
+            </div>
+            <div id="reviewList" class="review-list empty-block">No weak points yet.</div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="pasteDialog" class="modal" aria-labelledby="pasteDialogTitle">
+      <form method="dialog" class="modal-card">
+        <button id="closePasteBtn" class="modal-close" value="cancel" type="button">×</button>
+        <h3 id="pasteDialogTitle">Paste study text</h3>
+        <label for="pasteTitle">Label</label>
+        <input id="pasteTitle" type="text" value="Pasted material" />
+        <label for="pasteText">Text</label>
+        <textarea id="pasteText" rows="12" placeholder="Paste your notes here..."></textarea>
+        <div class="modal-actions">
+          <button id="savePasteBtn" class="primary-btn" type="button">Import text</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="settingsDialog" class="modal" aria-labelledby="settingsDialogTitle">
+      <form method="dialog" class="modal-card settings-card">
+        <button id="closeSettingsBtn" class="modal-close" value="cancel" type="button">×</button>
+        <h3 id="settingsDialogTitle">Settings</h3>
+        <div class="settings-block">
+          <div class="setting-row"><span>Account</span><strong id="settingsName">-</strong></div>
+          <div class="setting-row"><span>Email</span><strong id="settingsEmail">-</strong></div>
+        </div>
+        <div class="settings-block">
+          <label class="settings-label" for="settingsTheme">Theme</label>
+          <select id="settingsTheme" class="settings-select">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="auto">Auto</option>
+          </select>
+          <label class="settings-label" for="dailyGoalInput">Daily XP goal</label>
+          <input id="dailyGoalInput" type="number" min="10" max="200" step="5" value="30" inputmode="numeric" />
+          <label class="settings-label" for="lessonCapInput">Maximum generated lessons</label>
+          <input id="lessonCapInput" type="number" min="4" max="40" step="1" value="18" inputmode="numeric" />
+          <label class="settings-check"><input id="unlockAllLessonsInput" type="checkbox" /> Unlock all lessons after Begin</label>
+          <button id="saveSettingsBtn" class="primary-btn wide" type="button">Save preferences</button>
+        </div>
+        <div class="settings-block">
+          <button id="logoutBtn" class="danger-btn wide" type="button">Logout</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
